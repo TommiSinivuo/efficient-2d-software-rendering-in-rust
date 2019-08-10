@@ -3,7 +3,7 @@
 This repo is a workbench fr my personal studies in efficient 2d software rendering techniques.
 
 Currently it contains a test program, which renders a background (with some psychedelic gradient)
-+ n test textures that get rendered at a random position every frame.
+and n test textures that get rendered at a random position every frame.
 
 The rendering is all done in software and the final framebuffer is blitted using SDL (this last part is hardware accelerated thanks to SDL2,
 so blits are fast)).
@@ -27,7 +27,7 @@ This leads to about 30x performance compared to pixel by pixel rendering.
 ## Some very non-scientfic performance results
 
 On my personal computer, which has an AMD Ryzen 5 1600 running at 3.2 GhZ, rendering the background (which is the same size as the framebuffer)
-+ 1000 test textures of size 64x64 each, results in the following FPS for each framebuffer size using release build:
+and 1000 test textures of size 64x64 each, results in the following FPS for each framebuffer size using release build:
 
 | Framebuffer size (resolution) | FPS       |
 | ----------------------------- | ---------:|
@@ -50,6 +50,6 @@ In other words, rendering solid textures is pretty straight forward.
 
 ## Resources
 
-[Handmade Hero](https://handmadehero.org/watch)
-[Paper: Efficient 2D software rendering](https://www.researchgate.net/publication/271769119_Efficient_2D_software_rendering)
-[SDL2 Migration Guide](https://wiki.libsdl.org/MigrationGuide)
+- [Handmade Hero](https://handmadehero.org/watch)
+- [Paper: Efficient 2D software rendering](https://www.researchgate.net/publication/271769119_Efficient_2D_software_rendering)
+- [SDL2 Migration Guide](https://wiki.libsdl.org/MigrationGuide)
