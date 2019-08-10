@@ -1,6 +1,6 @@
 # Efficient 2D software rendering in Rust
 
-This repo is a workbench fr my personal studies in efficient 2d software rendering techniques.
+This repo is a workbench for my personal studies in efficient 2d software rendering techniques.
 
 Currently it contains a test program, which renders a background (with some psychedelic gradient)
 and n test textures that get rendered at a random position every frame.
@@ -19,10 +19,10 @@ in pixel by pixel rendering.
 
 ### Rendering textures in blocks instead of pixel by pixel
 
-Another convenient result whe using pointers is that rendering can now be done using system level
+Another convenient result when using pointers is that rendering can now be done using system level
 memory copying functions. I decided to use `memcpy` from `libc`, because it's straight forward.
-Instead rendering textures to framebuffer by copying pixel by pixel, I know memcpy each pixel row instead.
-This leads to about 30x performance compared to pixel by pixel rendering.
+Instead of rendering textures to framebuffer by copying pixel by pixel, I now memcpy each pixel row instead.
+This appears to lead to about 30x performance compared to pixel by pixel rendering.
 
 ## Some very non-scientfic performance results
 
