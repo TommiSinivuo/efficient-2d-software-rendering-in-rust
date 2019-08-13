@@ -2,6 +2,7 @@ extern crate libc;
 extern crate rand;
 extern crate sdl2;
 
+use core::arch::x86_64::_rdtsc;
 use libc::c_void;
 use rand::Rng;
 use sdl2::event::Event;
@@ -9,8 +10,8 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use std::mem;
 
-const FRAMEBUFFER_WIDTH: u32 = 1280;
-const FRAMEBUFFER_HEIGHT: u32 = 720;
+const FRAMEBUFFER_WIDTH: u32 = 2560;
+const FRAMEBUFFER_HEIGHT: u32 = 1440;
 const BYTES_PER_PIXEL: u8 = 4;
 const TEXTURE_WIDTH: u8 = 64;
 const TEXTURE_HEIGHT: u8 = 64;
@@ -196,6 +197,7 @@ fn main() -> Result<(), String> {
         test_textures.push(pbuffer);
     }
 
+    let mut last_cycle_count = unsafe { _rdtsc() };
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -224,12 +226,21 @@ fn main() -> Result<(), String> {
         canvas.copy(&texture, None, None)?;
         canvas.present();
 
+        let end_cycle_count = unsafe { _rdtsc() };
         let end_perf_counter = time.performance_counter();
+
+        let cycles_elapsed = end_cycle_count - last_cycle_count;
         let counter_elapsed = end_perf_counter - last_perf_counter;
         let ms_per_frame = (1000.0 * counter_elapsed as f32) / perf_count_frequency as f32; // How many milliseconds elapsed
         let fps = perf_count_frequency as f32 / counter_elapsed as f32;
-        println!("ms_per_frame={}, fps={}", ms_per_frame, fps);
+        let mega_cycles_per_frame = cycles_elapsed as f32 / (1000 * 1000) as f32;
 
+        println!(
+            "ms_per_frame={}, fps={}, mc/f={}",
+            ms_per_frame, fps, mega_cycles_per_frame
+        );
+
+        last_cycle_count = end_cycle_count;
         last_perf_counter = end_perf_counter;
     }
 
