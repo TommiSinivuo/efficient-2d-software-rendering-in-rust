@@ -10,19 +10,9 @@ so blits are fast)).
 
 ## Optimizations done to improve rendering speed
 
-### Manually managing memory for pixel buffers
-
-I use `libc::malloc` to allocate n bytes of memory for the framebuffer and other pixel buffers.
-As a result I get a raw pointer, which I traverse using pointer arithmetic when rendering.
-Switching from using a &[u8] to raw pointers for pixel buffers resulted in about 30% better performance
-in pixel by pixel rendering.
-
 ### Rendering textures in blocks instead of pixel by pixel
 
-Another convenient result when using pointers is that rendering can now be done using system level
-memory copying functions. I decided to use `memcpy` from `libc`, because it's straight forward.
-Instead of rendering textures to framebuffer by copying pixel by pixel, I now memcpy each pixel row instead.
-This appears to lead to about 30x performance compared to pixel by pixel rendering.
+Block copying is implemented by using raw pointers and `std::ptr::copy_nonoverlapping` function, which semantically same as C's `memcpy` function.
 
 ## Some very non-scientfic performance results
 
