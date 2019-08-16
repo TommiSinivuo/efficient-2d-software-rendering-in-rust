@@ -1,9 +1,7 @@
-extern crate libc;
 extern crate rand;
 extern crate sdl2;
 
 use core::arch::x86_64::_rdtsc;
-use libc::c_void;
 use rand::Rng;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -66,11 +64,7 @@ impl PixelBuffer {
                 let mut dest_pixel: *mut u32 = dest_row as *mut u32;
                 unsafe {
                     dest_pixel = dest_pixel.offset(pos_x as isize);
-                    libc::memcpy(
-                        dest_pixel as *mut c_void,
-                        src_row as *mut c_void,
-                        self.pitch as usize,
-                    );
+                    ptr::copy_nonoverlapping(src_row, dest_pixel as *mut u8, self.pitch as usize);
                     src_row = src_row.offset(self.pitch as isize);
                     dest_row = dest_row.offset(dest.pitch as isize);
                 }
