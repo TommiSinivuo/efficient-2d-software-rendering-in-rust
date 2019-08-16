@@ -9,6 +9,7 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use std::mem;
+use std::ptr;
 
 const FRAMEBUFFER_WIDTH: u32 = 2560;
 const FRAMEBUFFER_HEIGHT: u32 = 1440;
@@ -18,33 +19,17 @@ const TEXTURE_HEIGHT: u8 = 64;
 const TEXTURE_COUNT: usize = 1000;
 
 struct PixelBuffer {
-    memory: *mut c_void,
+    buffer: Vec<u8>,
     bytes_per_pixel: u8,
     pitch: u32,
     width_in_pixels: u32,
     height_in_pixels: u32,
-    size: usize,
-}
-
-impl Drop for PixelBuffer {
-    fn drop(&mut self) {
-        unsafe {
-            libc::free(self.memory);
-        }
-    }
 }
 
 impl PixelBuffer {
-    fn get_bytes(&self) -> &[u8] {
-        // TODO: verify that this is the correct way specify the size
-        let bytes: &[u8; mem::size_of::<usize>()];
-        unsafe { bytes = mem::transmute(self.memory) };
-        return bytes;
-    }
-
-    fn render_by_pixels(&self, dest: &PixelBuffer, pos_x: u32, pos_y: u32) {
-        let mut src_row: *mut u8 = self.memory as *mut u8;
-        let mut dest_row: *mut u8 = dest.memory as *mut u8;
+    fn render_by_pixels(&mut self, dest: &mut PixelBuffer, pos_x: u32, pos_y: u32) {
+        let mut src_row: *mut u8 = self.buffer.as_mut_ptr();
+        let mut dest_row: *mut u8 = dest.buffer.as_mut_ptr();
         unsafe { dest_row = dest_row.offset((pos_y * dest.pitch) as isize) };
         for _y in 0..self.height_in_pixels {
             let mut src_pixel: *mut u32 = src_row as *mut u32;
@@ -64,14 +49,18 @@ impl PixelBuffer {
         }
     }
 
-    fn render_by_blocks(&self, dest: &PixelBuffer, pos_x: u32, pos_y: u32) {
-        if self.size == dest.size && pos_x == 0 && pos_y == 0 {
+    fn render_by_blocks(&mut self, dest: &mut PixelBuffer, pos_x: u32, pos_y: u32) {
+        if self.buffer.len() == dest.buffer.len() && pos_x == 0 && pos_y == 0 {
             unsafe {
-                libc::memcpy(dest.memory, self.memory, dest.size);
+                ptr::copy_nonoverlapping(
+                    self.buffer.as_ptr(),
+                    dest.buffer.as_mut_ptr(),
+                    dest.buffer.len(),
+                );
             }
         } else {
-            let mut src_row: *mut u8 = self.memory as *mut u8;
-            let mut dest_row: *mut u8 = dest.memory as *mut u8;
+            let mut src_row: *mut u8 = self.buffer.as_mut_ptr();
+            let mut dest_row: *mut u8 = dest.buffer.as_mut_ptr();
             unsafe { dest_row = dest_row.offset((pos_y * dest.pitch) as isize) };
             for _y in 0..self.height_in_pixels {
                 let mut dest_pixel: *mut u32 = dest_row as *mut u32;
@@ -90,33 +79,21 @@ impl PixelBuffer {
     }
 }
 
-fn allocate_memory(bytes: usize) -> *mut c_void {
-    let memory: *mut c_void;
-    unsafe {
-        memory = libc::malloc(bytes) as *mut c_void;
-    }
-    if memory.is_null() {
-        panic!("Failed to allocate memory!");
-    }
-    return memory;
-}
-
 fn create_pixel_buffer(width: u32, height: u32, bytes_per_pixel: u8) -> PixelBuffer {
     let pitch = bytes_per_pixel as u32 * width;
     let buffer_size: usize = bytes_per_pixel as usize * (width * height) as usize;
-    let memory = allocate_memory(buffer_size);
+    let buffer = vec![0xFFu8; buffer_size];
     return PixelBuffer {
-        memory: memory,
+        buffer: buffer,
         bytes_per_pixel: bytes_per_pixel,
         pitch: pitch,
         width_in_pixels: width,
         height_in_pixels: height,
-        size: buffer_size,
     };
 }
 
-fn render_weird_gradient(buffer: &PixelBuffer) {
-    let mut row: *mut u8 = buffer.memory as *mut u8;
+fn render_weird_gradient(b: &mut PixelBuffer) {
+    let mut row: *mut u8 = b.buffer.as_mut_ptr();
     for y in 0..FRAMEBUFFER_HEIGHT {
         let mut pixel: *mut u32 = row as *mut u32;
         for x in 0..FRAMEBUFFER_WIDTH {
@@ -128,23 +105,23 @@ fn render_weird_gradient(buffer: &PixelBuffer) {
             }
         }
         unsafe {
-            row = row.offset(buffer.pitch as isize);
+            row = row.offset(b.pitch as isize);
         }
     }
 }
 
-fn render_color(buffer: &PixelBuffer, color: u32) {
-    let mut row: *mut u8 = buffer.memory as *mut u8;
-    for _y in 0..buffer.height_in_pixels {
+fn render_color(b: &mut PixelBuffer, color: u32) {
+    let mut row: *mut u8 = b.buffer.as_mut_ptr();
+    for _y in 0..b.height_in_pixels {
         let mut pixel: *mut u32 = row as *mut u32;
-        for _x in 0..buffer.width_in_pixels {
+        for _x in 0..b.width_in_pixels {
             unsafe {
                 *pixel = color;
                 pixel = pixel.offset(1);
             }
         }
         unsafe {
-            row = row.offset(buffer.pitch as isize);
+            row = row.offset(b.pitch as isize);
         }
     }
 }
@@ -178,22 +155,23 @@ fn main() -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
 
-    let framebuffer = create_pixel_buffer(FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT, BYTES_PER_PIXEL);
+    let mut framebuffer =
+        create_pixel_buffer(FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT, BYTES_PER_PIXEL);
 
     let mut event_pump = sdl_context.event_pump()?;
 
     let perf_count_frequency = time.performance_frequency();
     let mut last_perf_counter = time.performance_counter();
 
-    let background_buffer =
+    let mut background_buffer =
         create_pixel_buffer(FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT, BYTES_PER_PIXEL);
-    render_weird_gradient(&background_buffer);
+    render_weird_gradient(&mut background_buffer);
 
     let mut test_textures: Vec<PixelBuffer> = Vec::new();
     for x in 0..TEXTURE_COUNT {
-        let pbuffer =
+        let mut pbuffer =
             create_pixel_buffer(TEXTURE_WIDTH as u32, TEXTURE_HEIGHT as u32, BYTES_PER_PIXEL);
-        render_color(&pbuffer, x as u32);
+        render_color(&mut pbuffer, x as u32);
         test_textures.push(pbuffer);
     }
 
@@ -210,16 +188,20 @@ fn main() -> Result<(), String> {
             }
         }
 
-        background_buffer.render_by_blocks(&framebuffer, 0, 0);
+        background_buffer.render_by_blocks(&mut framebuffer, 0, 0);
 
-        for t in &test_textures {
+        for t in &mut test_textures {
             let x = rng.gen_range(0, FRAMEBUFFER_WIDTH - TEXTURE_WIDTH as u32);
             let y = rng.gen_range(0, FRAMEBUFFER_HEIGHT - TEXTURE_HEIGHT as u32);
-            t.render_by_blocks(&framebuffer, x, y);
+            t.render_by_blocks(&mut framebuffer, x, y);
         }
 
         texture
-            .update(None, framebuffer.get_bytes(), framebuffer.pitch as usize)
+            .update(
+                None,
+                &mut framebuffer.buffer[..],
+                framebuffer.pitch as usize,
+            )
             .unwrap();
 
         canvas.clear();
